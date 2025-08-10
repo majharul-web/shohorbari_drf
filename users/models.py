@@ -1,8 +1,9 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-from django.core.validators import validate_email
+from django.core.validators import validate_email, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from cloudinary.models import CloudinaryField
+from users.validators import validate_file_size
 
 # Custom User Manager
 class CustomUserManager(BaseUserManager):
@@ -53,6 +54,7 @@ class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='user')
+    profile_image = CloudinaryField('image', blank=True, null=True,validators=[validate_file_size, FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png'])])
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []  
@@ -63,14 +65,4 @@ class CustomUser(AbstractUser):
         return self.email
 
 
-# User Profile
-class UserProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='profile')
-    first_name = models.CharField(max_length=50, blank=True, null=True)
-    last_name = models.CharField(max_length=50, blank=True, null=True)
-    phone_number = models.CharField(max_length=15, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
-    image = CloudinaryField('image', blank=True, null=True)
 
-    def __str__(self):
-        return f"{self.user.email}'s profile"
