@@ -199,9 +199,9 @@ REST_FRAMEWORK = {
 
 # JWT settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(seconds=config("SIMPLE_JWT_ACCESS_TOKEN_LIFETIME", default=3600, cast=int)),
-    "REFRESH_TOKEN_LIFETIME": timedelta(seconds=config("SIMPLE_JWT_REFRESH_TOKEN_LIFETIME", default=86400, cast=int)),
-    "AUTH_HEADER_TYPES": ("Bearer",),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    "AUTH_HEADER_TYPES": ("JWT",),
 }
 
 # Djoser settings
