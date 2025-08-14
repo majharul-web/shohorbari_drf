@@ -19,7 +19,7 @@ Shohorbari is a comprehensive rental management application built using Django R
    ```
    Navigate to the project directory:
    ```bash
-   cd PhiMart
+   cd shohorbari_drf
    ```
 2. Create a virtual environment:
    ```bash
@@ -46,7 +46,7 @@ Shohorbari is a comprehensive rental management application built using Django R
 
 ## API Documentation
 
-API documentation is available at `http://localhost:8000/api/swagger/` when the server is running. It provides detailed information about the available endpoints, request parameters, and response formats.
+API documentation is available at `https://shohorbari-drf.vercel.app/swagger/` when the server is running. It provides detailed information about the available endpoints, request parameters, and response formats.
 
 ## Testing
 
