@@ -178,6 +178,11 @@ class FavoriteViewSet(viewsets.ModelViewSet):
         return FavoriteSerializer
 
     def get_queryset(self):
+        # Prevent error when generating Swagger schema
+        if getattr(self, 'swagger_fake_view', False):
+            return Favorite.objects.none()
+        
+        # Normal behavior for real requests
         return Favorite.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
