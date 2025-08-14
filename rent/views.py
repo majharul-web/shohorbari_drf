@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions, status, filters,serializers
+from rest_framework import viewsets, permissions, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -13,7 +13,7 @@ from rent.models import (
 from rent.serializers import (
     CategorySerializer,AdvertisementImageSerializer, RentAdvertisementSerializer, RentAdvertisementCreateSerializer,
     RentRequestSerializer, RentRequestCreateSerializer,
-    FavoriteSerializer, ReviewSerializer
+    FavoriteSerializer,GetFavoriteSerializer, ReviewSerializer,EmptySerializer
 )
 
 class IsOwnerOrAdmin(permissions.BasePermission):
@@ -38,7 +38,9 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
 
     def get_serializer_class(self):
-        if self.action in ['create']:
+        if self.action=="approve":
+            return EmptySerializer
+        if self.action == "create":
             return RentAdvertisementCreateSerializer
         return RentAdvertisementSerializer
 
@@ -101,7 +103,9 @@ class RentRequestViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
-        if self.action == "create":
+        if self.action=="accept":
+            return EmptySerializer
+        if self.action in ['create','update']:
             return RentRequestCreateSerializer
         return RentRequestSerializer
 
@@ -120,7 +124,7 @@ class RentRequestViewSet(viewsets.ModelViewSet):
         ad = RentAdvertisement.objects.get(id=ad_id)
         # Check if user already sent request or ad is approved/closed
         if RentRequest.objects.filter(advertisement=ad, sender=self.request.user).exists():
-            raise serializers.ValidationError("You already sent a request for this advertisement.")
+            raise serializers.ValidationError({"detail": "You have already sent a request for this advertisement."})
         serializer.save(advertisement=ad, sender=self.request.user, status="pending")
 
     @action(detail=True, methods=['post'])
@@ -138,13 +142,20 @@ class RentRequestViewSet(viewsets.ModelViewSet):
         return Response({"status": "request accepted"})
 
 class FavoriteViewSet(viewsets.ModelViewSet):
-    serializer_class = FavoriteSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return GetFavoriteSerializer
+        return FavoriteSerializer
 
     def get_queryset(self):
         return Favorite.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
+        # check if favorite already exists
+        if Favorite.objects.filter(user=self.request.user, advertisement=serializer.validated_data['advertisement']).exists():
+            raise serializers.ValidationError({"detail": "You have already favorited this advertisement."})
         serializer.save(user=self.request.user)
 
 class ReviewViewSet(viewsets.ModelViewSet):
@@ -157,4 +168,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         ad_id = self.kwargs.get("ad_pk")
+        # check if user already reviewed this ad
+        if Review.objects.filter(user=self.request.user, advertisement_id=ad_id).exists():
+            raise serializers.ValidationError({"detail": "You have already reviewed this advertisement."})
         serializer.save(user=self.request.user, advertisement_id=ad_id)

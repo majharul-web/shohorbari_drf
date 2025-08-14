@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review
 from django.contrib.auth import get_user_model
-
+class EmptySerializer(serializers.Serializer):
+    pass
 class AdvertisementImageSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(
         help_text="Image file for the product"
@@ -18,12 +19,27 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 
     def get_name(self, obj):
         return obj.get_full_name()
+class SimpleAdvertisementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RentAdvertisement
+        fields = ['id', 'title']
 
-class FavoriteSerializer(serializers.ModelSerializer):
+class GetFavoriteSerializer(serializers.ModelSerializer):
+    user= serializers.SerializerMethodField(method_name='get_user')
+    advertisement = SimpleAdvertisementSerializer()
+    def get_user(self, obj):
+        return SimpleUserSerializer(obj.user).data
+    
+    
     class Meta:
         model = Favorite
         fields = ["id", "user", "advertisement"]
         read_only_fields = ["user"]
+
+class FavoriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Favorite
+        fields = ["advertisement"]
 
 class ReviewSerializer(serializers.ModelSerializer):
     user= serializers.SerializerMethodField(method_name='get_user')
@@ -36,7 +52,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = ["id", "advertisement", "user", "rating", "comment", "created_at"]
         read_only_fields = ["advertisement", "user", "created_at"]
 
-class RentAdvertisementSerializer(serializers.ModelSerializer):
+class RentAdvertisementSerializer (serializers.ModelSerializer):
     images = AdvertisementImageSerializer(many=True, required=False, read_only=True)
     owner = serializers.ReadOnlyField(source="owner.id")
     reviews = ReviewSerializer(many=True, read_only=True)
@@ -62,7 +78,8 @@ class RentAdvertisementCreateSerializer(serializers.ModelSerializer):
         return ad
 
 class RentRequestSerializer(serializers.ModelSerializer):
-    sender = serializers.ReadOnlyField(source="sender.id")
+    sender = SimpleUserSerializer()
+    advertisement = SimpleAdvertisementSerializer()
 
     class Meta:
         model = RentRequest
