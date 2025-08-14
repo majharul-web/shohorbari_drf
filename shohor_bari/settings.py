@@ -82,7 +82,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'shohor_bari.wsgi.application'
+WSGI_APPLICATION = 'shohor_bari.wsgi.app'
 
 
 # Database
