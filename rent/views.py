@@ -62,8 +62,9 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
         elif self.action in ['approve', 'pending']:
             return [permissions.IsAdminUser()]
+       
         else:
-            return [permissions.AllowAny()]
+            return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
         """
