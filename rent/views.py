@@ -103,7 +103,7 @@ class AdvertisementImageViewSet(viewsets.ModelViewSet):
     API endpoint for managing images of a specific rental advertisement.
     """
     serializer_class = AdvertisementImageSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):

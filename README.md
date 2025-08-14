@@ -89,4 +89,3 @@ maintainer at [majharul.dev.alt@gmail.com](mailto:majharul.dev.alt@gmail.com)
 ## Acknowledgements
 
 - Thanks to the Django and Django Rest Framework communities for their excellent documentation and support.
-- Inspired by various e-commerce platforms and best practices in web development.
