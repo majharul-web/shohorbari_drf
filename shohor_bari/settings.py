@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-
+from corsheaders.defaults import default_headers
 from decouple import config
 from pathlib import Path
 from datetime import timedelta
@@ -22,6 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*").split(',')
+
+
 
 INTERNAL_IPS = [
     "127.0.0.1",
@@ -41,6 +43,7 @@ INSTALLED_APPS = [
     
     # third-party apps
     'drf_yasg',
+    "corsheaders",
     'django_filters',   
     'rest_framework',
     'djoser',
@@ -54,6 +57,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware", # CORS Middleware
     "debug_toolbar.middleware.DebugToolbarMiddleware", # Debug Toolbar Middleware
     'django.middleware.security.SecurityMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware", # WhiteNoise Middleware
@@ -83,6 +87,24 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'shohor_bari.wsgi.app'
+
+# Allow specific frontend origins
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+
+# If you need to allow all origins (not recommended for production):
+# CORS_ALLOW_ALL_ORIGINS = True
+
+# Allow Authorization header for JWT
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "access-control-allow-origin",
+    "authorization",
+]
+
+# Allow credentials (if you are using cookies/session auth)
+CORS_ALLOW_CREDENTIALS = True
+
 
 
 # Database
