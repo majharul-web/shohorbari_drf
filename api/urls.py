@@ -7,7 +7,11 @@ from rent.views import (
     FavoriteViewSet,
     RentRequestViewSet,
     ReviewViewSet,
-    AdvertisementImageViewSet
+    AdvertisementImageViewSet,
+    initiate_payment,
+    payment_success,
+    payment_fail,
+    payment_cancel
 )
 from admin_app.views import DashboardStatsViewSet
 
@@ -29,4 +33,8 @@ urlpatterns = [
     path('', include(ads_router.urls)),
     path('auth/', include('djoser.urls')),
     path('auth/', include('djoser.urls.jwt')),
+    path("payment/initiate/", initiate_payment, name="initiate-payment"),
+    path("payment/success/", payment_success, name="payment-success"),
+    path("payment/fail/", payment_fail, name="payment-fail"),
+    path("payment/cancel/", payment_cancel, name="payment-cancel"),
 ]

@@ -1,20 +1,31 @@
 from rest_framework import viewsets, permissions, status, filters, serializers
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.db.models import Prefetch
-
+from django.http import HttpResponseRedirect
+from sslcommerz_lib import SSLCOMMERZ
+import requests
 from api.permissions import IsAdminOrReadOnly
 from rent.paginations import DefaultPagination
 from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review
+
+
+
+
 from rent.serializers import (
     CategorySerializer, AdvertisementImageSerializer, RentAdvertisementSerializer,
     RentAdvertisementCreateSerializer, RentRequestSerializer, RentRequestCreateSerializer,
     FavoriteSerializer, GetFavoriteSerializer, ReviewSerializer, EmptySerializer
 )
 
+
+from django.conf import settings as main_settings
+
+from rest_framework.decorators import permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 class IsOwnerOrAdmin(permissions.BasePermission):
     """
@@ -208,3 +219,95 @@ class ReviewViewSet(viewsets.ModelViewSet):
         if Review.objects.filter(user=self.request.user, advertisement_id=ad_id).exists():
             raise serializers.ValidationError({"detail": "You have already reviewed this advertisement."})
         serializer.save(user=self.request.user, advertisement_id=ad_id)
+
+
+SSLCZ_STORE_ID = "shoho68bfb2678b5d6"
+SSLCZ_STORE_PASSWD = "shoho68bfb2678b5d6@ssl"
+SSLCZ_INIT_URL = "https://sandbox.sslcommerz.com/gwprocess/v4/api.php"
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def initiate_payment(request):
+    user = request.user
+    amount = request.data.get("amount")
+    order_id = request.data.get("orderId")
+    num_items = request.data.get("numItems")
+
+    if not all([amount, order_id, num_items]):
+        return Response({"status": "FAILED", "message": "Missing required fields"}, status=400)
+
+    post_data = {
+        "store_id": SSLCZ_STORE_ID,
+        "store_passwd": SSLCZ_STORE_PASSWD,
+        "total_amount": amount,
+        "currency": "BDT",
+        "tran_id": order_id,
+        "success_url": "http://127.0.0.1:8000/api/v1/payment/success/",
+        "fail_url": "http://127.0.0.1:8000/api/v1/payment/fail/",
+        "cancel_url": "http://127.0.0.1:8000/api/v1/payment/cancel/",
+        "emi_option": 0,
+        "cus_name": user.get_full_name() or "Customer Name",
+        "cus_email": user.email or "customer@example.com",
+        "cus_add1": "Dhaka",
+        "cus_city": "Dhaka",
+        "cus_country": "Bangladesh",
+        "cus_postcode": "1000",
+        "cus_phone": "01700000000",
+        "cus_fax": "01711111111",
+        "shipping_method": "NO",
+        "num_of_item": num_items,
+        "ship_name": "Customer Name",
+        "ship_add1": "Dhaka",
+        "ship_city": "Dhaka",
+        "ship_postcode": "1000",
+        "ship_country": "Bangladesh",
+        "product_name": "Demo Product",
+        "product_category": "General",
+        "product_profile": "general",
+    }
+
+    try:
+        response = requests.post(SSLCZ_INIT_URL, data=post_data)  # ✅ use requests.post
+        data = response.json()
+
+        if data.get("status") == "FAILED":
+            return Response(data, status=400)
+
+        return Response(data, status=200)
+
+    except Exception as e:
+        return Response({"status": "FAILED", "message": str(e)}, status=500)
+
+
+@api_view(["POST"])
+def payment_success(request):
+    # SSLCommerz sends transaction details here
+    data = request.data
+    print("✅ Payment Success:", data)
+
+    # Update order/payment status in DB
+    # Example: mark order_id as PAID
+    order_id = data.get("tran_id")
+    # Update the order status in your database
+    order=RentRequest.objects.get(id=order_id)
+    order.status="advanced"
+    order.save()
+    return Response({"status": "SUCCESS", "data": data})
+
+
+@api_view(["POST"])
+def payment_fail(request):
+    data = request.data
+    print("❌ Payment Failed:", data)
+
+    # Update order/payment status as FAILED
+    return Response({"status": "FAILED", "data": data})
+
+
+@api_view(["POST"])
+def payment_cancel(request):
+    data = request.data
+    print("⚠️ Payment Cancelled:", data)
+
+    # Update order/payment status as CANCELLED
+    return Response({"status": "CANCELLED", "data": data})

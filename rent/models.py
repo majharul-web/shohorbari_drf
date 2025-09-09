@@ -83,6 +83,10 @@ class RentRequest(models.Model):
     STATUS_CHOICES = (
         ("pending", "Pending"),
         ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+        ("canceled", "Canceled"),
+        ("completed", "Completed"),
+        ("advanced", "Advanced"),
         ("closed", "Closed"),
     )
 
