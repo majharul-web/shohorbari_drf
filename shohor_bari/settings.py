@@ -91,6 +91,7 @@ WSGI_APPLICATION = 'shohor_bari.wsgi.app'
 # Allow specific frontend origins
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "https://shohorbari.vercel.app"
 ]
 
 # If you need to allow all origins (not recommended for production):

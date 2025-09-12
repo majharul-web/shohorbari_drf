@@ -32,6 +32,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
+    pagination_class = DefaultPagination
 
 
 class RentAdvertisementViewSet(viewsets.ModelViewSet):
