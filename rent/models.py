@@ -11,6 +11,11 @@ class Category(models.Model):
         max_length=100,
         help_text="Name of the category."
     )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when the advertisement was created."
+    )
 
     def __str__(self):
         return self.name
