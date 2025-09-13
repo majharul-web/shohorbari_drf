@@ -224,9 +224,10 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 SSLCZ_STORE_ID = "shoho68bfb2678b5d6"
 SSLCZ_STORE_PASSWD = "shoho68bfb2678b5d6@ssl"
-SSLCZ_INIT_URL = "https://sandbox.sslcommerz.com/gwprocess/v4/api.php"
 
-@api_view(["POST"])
+
+
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def initiate_payment(request):
     user = request.user
@@ -235,65 +236,87 @@ def initiate_payment(request):
     num_items = request.data.get("numItems")
 
     if not all([amount, order_id, num_items]):
-        return Response({"status": "FAILED", "message": "Missing required fields"}, status=400)
+        return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
-    post_data = {
-        "store_id": SSLCZ_STORE_ID,
-        "store_passwd": SSLCZ_STORE_PASSWD,
-        "total_amount": amount,
-        "currency": "BDT",
-        "tran_id": order_id,
-        "success_url": "http://127.0.0.1:8000/api/v1/payment/success/",
-        "fail_url": "http://127.0.0.1:8000/api/v1/payment/fail/",
-        "cancel_url": "http://127.0.0.1:8000/api/v1/payment/cancel/",
-        "emi_option": 0,
-        "cus_name": user.get_full_name() or "Customer Name",
-        "cus_email": user.email or "customer@example.com",
-        "cus_add1": "Dhaka",
-        "cus_city": "Dhaka",
-        "cus_country": "Bangladesh",
-        "cus_postcode": "1000",
-        "cus_phone": "01700000000",
-        "cus_fax": "01711111111",
-        "shipping_method": "NO",
-        "num_of_item": num_items,
-        "ship_name": "Customer Name",
-        "ship_add1": "Dhaka",
-        "ship_city": "Dhaka",
-        "ship_postcode": "1000",
-        "ship_country": "Bangladesh",
-        "product_name": "Demo Product",
-        "product_category": "General",
-        "product_profile": "general",
+    # SSLCommerz sandbox credentials
+    settings = {
+        'store_id': SSLCZ_STORE_ID,
+        'store_pass': SSLCZ_STORE_PASSWD,
+        'issandbox': True
+    }
+
+    sslcz = SSLCOMMERZ(settings)
+
+    post_body = {
+        'total_amount': amount,
+        'currency': "BDT",
+        'tran_id': f"txn_{order_id}",
+        'success_url': f"{main_settings.BACKEND_URL}/api/v1/payment/success/",
+        'fail_url': f"{main_settings.BACKEND_URL}/api/v1/payment/fail/",
+        'cancel_url': f"{main_settings.BACKEND_URL}/api/v1/payment/cancel/",
+        'emi_option': 0,
+        'cus_name': f"{user.first_name} {user.last_name}" or "Customer Name",
+        'cus_email': user.email or "customer@example.com",
+        'cus_phone': getattr(user, 'phone_number', '01700000000'),
+        'cus_add1': getattr(user, 'address', 'Dhaka'),
+        'cus_city': "Dhaka",
+        'cus_country': "Bangladesh",
+        
+        # ✅ Required shipping info
+        'ship_name': f"{user.first_name} {user.last_name}" or "Customer Name",
+        'ship_add1': getattr(user, 'address', 'Dhaka'),
+        'ship_city': "Dhaka",
+        'ship_postcode': "1000",
+        'ship_country': "Bangladesh",
+        
+        'shipping_method': "Courier",
+        'multi_card_name': "",
+        'num_of_item': num_items,
+        'product_name': "E-commerce Products",
+        'product_category': "General",
+        'product_profile': "general"
     }
 
     try:
-        response = requests.post(SSLCZ_INIT_URL, data=post_data)  # ✅ use requests.post
-        data = response.json()
-
-        if data.get("status") == "FAILED":
-            return Response(data, status=400)
-
-        return Response(data, status=200)
-
+        response = sslcz.createSession(post_body)  # create sandbox session
+        if response.get("status") == 'SUCCESS':
+            return Response({"payment_url": response['GatewayPageURL']}, status=status.HTTP_200_OK)
+        return Response({"error": "Payment initiation failed", "details": response}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response({"status": "FAILED", "message": str(e)}, status=500)
+        return Response({"error": "Exception occurred", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# {
+#   "amount": 1500,
+#   "orderId": "ORD987654",
+#   "numItems": 3
+# }
+
 
 
 @api_view(["POST"])
 def payment_success(request):
-    # SSLCommerz sends transaction details here
     data = request.data
     print("✅ Payment Success:", data)
 
-    # Update order/payment status in DB
-    # Example: mark order_id as PAID
-    order_id = data.get("tran_id")
-    # Update the order status in your database
-    order=RentRequest.objects.get(id=order_id)
-    order.status="advanced"
-    order.save()
+    tran_id = data.get("tran_id")  # SSLCommerz returns this
+    if not tran_id:
+        return Response({"error": "Missing tran_id"}, status=400)
+
+    # Extract order_id from tran_id (because you set it as txn_{order_id})
+    try:
+        order_id = tran_id.split("_", 1)[1]   # gets "ORD987654"
+    except IndexError:
+        return Response({"error": "Invalid tran_id format"}, status=400)
+
+    try:
+        order = RentRequest.objects.get(id=order_id)
+        order.status = "advanced"   # mark as paid/advanced
+        order.save()
+    except RentRequest.DoesNotExist:
+        return Response({"error": f"RentRequest {order_id} not found"}, status=404)
+
     return Response({"status": "SUCCESS", "data": data})
+
 
 
 @api_view(["POST"])

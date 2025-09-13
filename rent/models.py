@@ -53,6 +53,10 @@ class RentAdvertisement(models.Model):
         default=False,
         help_text="Whether the advertisement is approved by admin."
     )
+    booked = models.BooleanField(
+        default=False,
+        help_text="Whether the advertisement is booked."
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         help_text="Timestamp when the advertisement was created."

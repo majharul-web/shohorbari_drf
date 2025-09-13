@@ -23,7 +23,16 @@ class AdvertisementImageSerializer(serializers.ModelSerializer):
         model = AdvertisementImage
         fields = ["id", "image"]
 
+class CategorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for property categories.
+    """
+    name = serializers.CharField(help_text="Name of the category.")
 
+    class Meta:
+        model = Category
+        fields = ["id", "name", "created_at"]
+        
 class SimpleUserSerializer(serializers.ModelSerializer):
     """
     Simplified user representation showing only `id` and `name`.
@@ -99,14 +108,15 @@ class RentAdvertisementSerializer(serializers.ModelSerializer):
     Includes images and reviews.
     """
     images = AdvertisementImageSerializer(many=True, required=False, read_only=True)
-    owner = serializers.ReadOnlyField(source="owner.id", help_text="ID of the advertisement owner.")
+    owner = SimpleUserSerializer(read_only=True)
+    category = CategorySerializer(read_only=True)
     reviews = ReviewSerializer(many=True, read_only=True)
 
     class Meta:
         model = RentAdvertisement
         fields = [
             "id", "owner", "category", "title", "description", "price",
-            "approved", "created_at", "images", "reviews"
+            "approved", "booked", "created_at", "images", "reviews"
         ]
 
 
@@ -155,12 +165,4 @@ class RentRequestCreateSerializer(serializers.ModelSerializer):
         fields = ["message"]
 
 
-class CategorySerializer(serializers.ModelSerializer):
-    """
-    Serializer for property categories.
-    """
-    name = serializers.CharField(help_text="Name of the category.")
 
-    class Meta:
-        model = Category
-        fields = ["id", "name", "created_at"]
