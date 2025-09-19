@@ -222,7 +222,7 @@ REST_FRAMEWORK = {
 BACKEND_URL = config("BACKEND_URL")
 FRONTEND_URL = config("FRONTEND_URL")
 
-DOMAIN = FRONTEND_URL
+DOMAIN = "shohorbari.vercel.app"
 SITE_NAME = "Shohorbari"
 
 
