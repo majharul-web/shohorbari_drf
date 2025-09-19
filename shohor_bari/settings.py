@@ -219,6 +219,13 @@ REST_FRAMEWORK = {
     # 'PAGE_SIZE': 10,
     
 }
+BACKEND_URL = config("BACKEND_URL")
+FRONTEND_URL = config("FRONTEND_URL")
+
+DOMAIN = FRONTEND_URL
+SITE_NAME = "Shohorbari"
+
+
 
 # JWT settings
 SIMPLE_JWT = {
@@ -251,5 +258,3 @@ SWAGGER_SETTINGS = {
    }
 }
 
-BACKEND_URL = config("BACKEND_URL")
-FRONTEND_URL = config("FRONTEND_URL")
