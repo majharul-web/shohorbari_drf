@@ -41,7 +41,7 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'email','profile_image']
 
     def get_name(self, obj):
         return obj.get_full_name()
@@ -51,9 +51,18 @@ class SimpleAdvertisementSerializer(serializers.ModelSerializer):
     """
     Simplified advertisement serializer for nested usage.
     """
+    image = serializers.SerializerMethodField(help_text="URL of the first image of the advertisement.")  
+
     class Meta:
         model = RentAdvertisement
-        fields = ['id', 'title']
+        fields = ['id', 'title', 'price', 'booked', 'image']
+
+    def get_image(self, obj):
+        first_image = obj.images.first()
+        if first_image:
+            return first_image.image.url  # <-- CloudinaryField gives .url
+        return None
+
 
 
 class GetFavoriteSerializer(serializers.ModelSerializer):
