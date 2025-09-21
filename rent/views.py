@@ -184,6 +184,8 @@ class FavoriteViewSet(viewsets.ModelViewSet):
     API endpoint for managing user favorites.
     """
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = DefaultPagination
+    
 
     def get_serializer_class(self):
         if self.action == "list":
