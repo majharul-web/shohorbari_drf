@@ -74,9 +74,9 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
         elif self.action in ['approve', 'pending']:
             return [permissions.IsAdminUser()]
+        else :
+            return [permissions.IsAuthenticatedOrReadOnly()]
        
-        else:
-            return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
         """
@@ -115,7 +115,7 @@ class AdvertisementImageViewSet(viewsets.ModelViewSet):
     API endpoint for managing images of a specific rental advertisement.
     """
     serializer_class = AdvertisementImageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
