@@ -8,6 +8,7 @@ from rent.views import (
     RentRequestViewSet,
     ReviewViewSet,
     AdvertisementImageViewSet,
+    MyRequestsViewSet,
     initiate_payment,
     payment_success,
     payment_fail,
@@ -21,6 +22,9 @@ router.register("ads", RentAdvertisementViewSet, basename="ads")
 router.register("favorites", FavoriteViewSet, basename="favorites")
 router.register("categories", CategoryViewSet, basename="categories")
 router.register("dashboard/stats", DashboardStatsViewSet, basename="dashboard-stats")
+router.register("my-requests", MyRequestsViewSet, basename="my-requests")
+
+
 
 # Nested routes for ads
 ads_router = routers.NestedSimpleRouter(router, "ads", lookup="ad")

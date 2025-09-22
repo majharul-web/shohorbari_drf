@@ -178,6 +178,29 @@ class RentRequestViewSet(viewsets.ModelViewSet):
         RentRequest.objects.filter(advertisement=ad).exclude(id=rent_request.id).update(status="closed")
         return Response({"status": "request accepted"})
 
+class MyRequestsViewSet(viewsets.ViewSet):
+    """
+    API endpoint to list all rent requests made by the authenticated user.
+    Supports filtering by status (?status=pending).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request):
+        # ✅ Start with requests sent by the logged-in user
+        queryset = RentRequest.objects.filter(sender=request.user).select_related(
+            "advertisement", "advertisement__owner"
+        ).prefetch_related("advertisement__images")
+
+        # ✅ Optional filter by status
+        status = request.query_params.get("status")
+        if status:
+            queryset = queryset.filter(status=status)
+
+        serializer = RentRequestSerializer(queryset, many=True)
+        return Response({
+            "count": queryset.count(),
+            "results": serializer.data
+        })
 
 class FavoriteViewSet(viewsets.ModelViewSet):
     """
