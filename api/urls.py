@@ -9,12 +9,17 @@ from rent.views import (
     ReviewViewSet,
     AdvertisementImageViewSet,
     MyRequestsViewSet,
+    
+    MyPaymentsViewSet,
     initiate_payment,
     payment_success,
     payment_fail,
     payment_cancel
 )
-from admin_app.views import DashboardStatsViewSet
+from admin_app.views import (
+    DashboardStatsViewSet,
+    PaymentTransactionViewSet
+)
 
 # Main router
 router = routers.DefaultRouter()
@@ -23,6 +28,10 @@ router.register("favorites", FavoriteViewSet, basename="favorites")
 router.register("categories", CategoryViewSet, basename="categories")
 router.register("dashboard/stats", DashboardStatsViewSet, basename="dashboard-stats")
 router.register("my-requests", MyRequestsViewSet, basename="my-requests")
+# existing router
+router.register("payments", PaymentTransactionViewSet, basename="payments")      # admin only
+router.register("my-payments", MyPaymentsViewSet, basename="my-payments")       # user history (readonly)
+
 
 
 

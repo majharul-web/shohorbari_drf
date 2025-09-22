@@ -26,7 +26,7 @@ import uuid
 from rent.serializers import (
     CategorySerializer, AdvertisementImageSerializer, RentAdvertisementSerializer,
     RentAdvertisementCreateSerializer, RentRequestSerializer, RentRequestCreateSerializer,
-    FavoriteSerializer, GetFavoriteSerializer, ReviewSerializer, EmptySerializer,CreatePaymentSerializer
+    FavoriteSerializer, GetFavoriteSerializer, ReviewSerializer, EmptySerializer,CreatePaymentSerializer,PaymentTransactionSerializer
 )
 
 
@@ -290,6 +290,28 @@ class ReviewViewSet(viewsets.ModelViewSet):
         if Review.objects.filter(user=self.request.user, advertisement_id=ad_id).exists():
             raise serializers.ValidationError({"detail": "You have already reviewed this advertisement."})
         serializer.save(user=self.request.user, advertisement_id=ad_id)
+        
+
+
+
+
+class MyPaymentsViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Endpoint for an authenticated user to see their payments.
+    GET /my-payments/
+    Supports ?status=success etc.
+    """
+    serializer_class = PaymentTransactionSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = DefaultPagination  # reuse your pagination
+
+    def get_queryset(self):
+        qs = PaymentTransaction.objects.filter(user=self.request.user).select_related("rent_request")
+        status = self.request.query_params.get("status")
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
 
 
 # {

@@ -1,9 +1,14 @@
 from rest_framework.viewsets import ViewSet
+from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
+from rent.serializers import PaymentTransactionSerializer
+from rent.models import PaymentTransaction
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from django.db.models import Count, Q
 from django.utils.timezone import now, timedelta
 from rent.models import RentAdvertisement
+from rent.paginations import DefaultPagination
 
 
 class DashboardStatsViewSet(ViewSet):
@@ -53,3 +58,16 @@ class DashboardStatsViewSet(ViewSet):
         )
 
         return Response(stats)
+
+class PaymentTransactionViewSet(viewsets.ModelViewSet):
+    """
+    Admin viewset to list/manage all payment transactions.
+    """
+    queryset = PaymentTransaction.objects.all().select_related("user", "rent_request")
+    serializer_class = PaymentTransactionSerializer
+    permission_classes = [IsAdminUser]
+    pagination_class = DefaultPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ["status", "payment_type", "currency", "user__id"]
+    search_fields = ["transaction_id", "user__email"]
+    ordering_fields = ["created_at", "amount"]
