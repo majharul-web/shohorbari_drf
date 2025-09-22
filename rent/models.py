@@ -57,6 +57,29 @@ class RentAdvertisement(models.Model):
         default=False,
         help_text="Whether the advertisement is booked."
     )
+    booked_by = models.ForeignKey(   
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="booked_ads",
+        help_text="User who successfully booked this advertisement via payment."
+    )
+
+    accepted = models.BooleanField(
+        default=False,
+        help_text="Whether the advertisement is booked."
+    )
+    
+    accepted_for = models.ForeignKey(   
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accepted_ads",
+        help_text="User who successfully accepted this advertisement via request."
+    )
+    
     created_at = models.DateTimeField(
         auto_now_add=True,
         help_text="Timestamp when the advertisement was created."
@@ -192,3 +215,37 @@ class Review(models.Model):
     
     def __str__(self):
         return f'Review by {self.user.first_name} for {self.advertisement.title}'
+
+
+
+class PaymentTransaction(models.Model):
+    STATUS_CHOICES = (
+        ("initiated", "Initiated"),
+        ("pending", "Pending"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+    )
+
+    PAYMENT_TYPE_CHOICES = (
+        ("rent", "Rent"),
+        ("security_deposit", "Security Deposit"),
+        ("other", "Other"),
+    )
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments")
+    rent_request = models.ForeignKey("RentRequest", on_delete=models.SET_NULL, null=True, blank=True, related_name="payments")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=10, default="BDT")
+    payment_type = models.CharField(max_length=30, choices=PAYMENT_TYPE_CHOICES, default="rent")
+    transaction_id = models.CharField(max_length=200, unique=True)  # tran_id from gateway (txn_xxx)
+    gateway_response = models.JSONField(null=True, blank=True)      # raw payload for debugging/audit
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="initiated")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.transaction_id} - {self.user} - {self.amount} {self.currency} - {self.status}"

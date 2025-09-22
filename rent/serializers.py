@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review
+from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review, PaymentTransaction
 from django.contrib.auth import get_user_model
 
 
@@ -172,6 +172,21 @@ class RentRequestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = RentRequest
         fields = ["message"]
+
+
+
+class PaymentTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentTransaction
+        fields = "__all__"
+        read_only_fields = ["id", "user", "gateway_response", "created_at", "updated_at"]
+
+class CreatePaymentSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    order_id = serializers.CharField()   # your internal order/rent_request id
+    num_items = serializers.IntegerField(required=False, default=1)
+    payment_type = serializers.ChoiceField(choices=PaymentTransaction.PAYMENT_TYPE_CHOICES, default="rent")
+
 
 
 

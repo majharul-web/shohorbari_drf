@@ -10,7 +10,15 @@ from sslcommerz_lib import SSLCOMMERZ
 import requests
 from api.permissions import IsAdminOrReadOnly
 from rent.paginations import DefaultPagination
-from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review
+from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review,PaymentTransaction
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import api_view, permission_classes
+from django.conf import settings
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+
+
+import uuid
 
 
 
@@ -18,7 +26,7 @@ from rent.models import Category, RentAdvertisement, AdvertisementImage, RentReq
 from rent.serializers import (
     CategorySerializer, AdvertisementImageSerializer, RentAdvertisementSerializer,
     RentAdvertisementCreateSerializer, RentRequestSerializer, RentRequestCreateSerializer,
-    FavoriteSerializer, GetFavoriteSerializer, ReviewSerializer, EmptySerializer
+    FavoriteSerializer, GetFavoriteSerializer, ReviewSerializer, EmptySerializer,CreatePaymentSerializer
 )
 
 
@@ -157,9 +165,17 @@ class RentRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         ad_id = self.kwargs.get("ad_pk")
         ad = RentAdvertisement.objects.get(id=ad_id)
+
+        # ❌ Prevent new requests if one already accepted
+        if RentRequest.objects.filter(advertisement=ad, status="accepted").exists():
+            raise serializers.ValidationError({"detail": "This advertisement already has an accepted request. You cannot send a new request."})
+
+        # ❌ Prevent same user sending multiple requests
         if RentRequest.objects.filter(advertisement=ad, sender=self.request.user).exists():
             raise serializers.ValidationError({"detail": "You have already sent a request for this advertisement."})
+
         serializer.save(advertisement=ad, sender=self.request.user, status="pending")
+
 
     @swagger_auto_schema(
         method='post',
@@ -167,16 +183,45 @@ class RentRequestViewSet(viewsets.ModelViewSet):
         operation_description="Accept a rent request and close all other requests for the same advertisement.",
         responses={200: openapi.Response("Request accepted")}
     )
+
     @action(detail=True, methods=['post'])
     def accept(self, request, ad_pk=None, pk=None):
         rent_request = self.get_object()
         ad = rent_request.advertisement
-        if request.user != ad.owner:
+
+        # ❌ Only owner can accept
+        if request.user.id != ad.owner_id:
             return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
-        rent_request.status = "accepted"
-        rent_request.save()
-        RentRequest.objects.filter(advertisement=ad).exclude(id=rent_request.id).update(status="closed")
-        return Response({"status": "request accepted"})
+
+        # ❌ Prevent accepting multiple requests
+        if RentRequest.objects.filter(advertisement=ad, status="accepted").exists():
+            return Response(
+                {"detail": "An accepted request already exists for this advertisement."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ✅ Wrap in transaction
+        with transaction.atomic():
+            # Accept this request
+            rent_request.status = "accepted"
+            rent_request.save()
+
+            # Update advertisement
+            ad.accepted = True
+            ad.accepted_for = rent_request.sender   # or .renter depending on your model
+            ad.save()
+
+            # Close other requests
+            RentRequest.objects.filter(advertisement=ad).exclude(id=rent_request.id).update(status="closed")
+
+        return Response({
+            "status": "request accepted",
+            "advertisement": ad.id,
+            "accepted_for": ad.accepted_for.id if ad.accepted_for else None
+        })
+
+
+
 
 class MyRequestsViewSet(viewsets.ViewSet):
     """
@@ -247,101 +292,160 @@ class ReviewViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user, advertisement_id=ad_id)
 
 
+# {
+#   "amount": 1500,
+#   "order_id": 4,
+# }
+
 SSLCZ_STORE_ID = "shoho68bfb2678b5d6"
 SSLCZ_STORE_PASSWD = "shoho68bfb2678b5d6@ssl"
 
-
+# Helper to generate unique tran_id
+def generate_tran_id(order_id):
+    return f"txn_{order_id}_{uuid.uuid4().hex[:8]}"
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([permissions.IsAuthenticated])
 def initiate_payment(request):
-    user = request.user
-    amount = request.data.get("amount")
-    order_id = request.data.get("orderId")
-    num_items = request.data.get("numItems")
+    """
+    Initiate payment: create PaymentTransaction and SSLCOMMERZ session.
+    Body: { amount, order_id, num_items, payment_type }
+    """
+    serializer = CreatePaymentSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
 
-    if not all([amount, order_id, num_items]):
-        return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+    amount = data["amount"]
+    order_id = data["order_id"]
+    num_items = data.get("num_items", 1)
+    payment_type = data.get("payment_type", "rent")
 
-    # SSLCommerz sandbox credentials
-    settings = {
+    # Build unique tran_id
+    tran_id = generate_tran_id(order_id)
+    
+
+    # Create DB record (initiated)
+    with transaction.atomic():
+        rent_request = None
+        rent_request_id = order_id if payment_type == "rent" else None
+        
+        if rent_request_id:
+            try:
+                rent_request = RentRequest.objects.get(id=rent_request_id)
+            except RentRequest.DoesNotExist:
+                return Response({"error": "Rent request not found"}, status=404)
+            
+        tx = PaymentTransaction.objects.create(
+            user=request.user,
+            rent_request=rent_request,
+            amount=amount,
+            currency="BDT",
+            payment_type=payment_type,
+            transaction_id=tran_id,
+            status="initiated",
+        )
+
+    # Prepare SSLCommerz payload
+    settings_map = {
         'store_id': SSLCZ_STORE_ID,
         'store_pass': SSLCZ_STORE_PASSWD,
-        'issandbox': True
+        'issandbox':  True
     }
-
-    sslcz = SSLCOMMERZ(settings)
+    sslcz = SSLCOMMERZ(settings_map)
 
     post_body = {
-        'total_amount': amount,
+        'total_amount': str(amount),
         'currency': "BDT",
-        'tran_id': f"txn_{order_id}",
-        'success_url': f"{main_settings.BACKEND_URL}/api/v1/payment/success/",
-        'fail_url': f"{main_settings.BACKEND_URL}/api/v1/payment/fail/",
-        'cancel_url': f"{main_settings.BACKEND_URL}/api/v1/payment/cancel/",
+        'tran_id': tran_id,
+        'success_url': f"{settings.BACKEND_URL}/api/v1/payment/success/",
+        'fail_url': f"{settings.BACKEND_URL}/api/v1/payment/fail/",
+        'cancel_url': f"{settings.BACKEND_URL}/api/v1/payment/cancel/",
         'emi_option': 0,
-        'cus_name': f"{user.first_name} {user.last_name}" or "Customer Name",
-        'cus_email': user.email or "customer@example.com",
-        'cus_phone': getattr(user, 'phone_number', '01700000000'),
-        'cus_add1': getattr(user, 'address', 'Dhaka'),
+        'cus_name': f"{request.user.first_name} {request.user.last_name}" or "Customer",
+        'cus_email': request.user.email or "customer@example.com",
+        'cus_phone': getattr(request.user, "phone_number", "01700000000"),
+        'cus_add1': getattr(request.user, "address", "Dhaka"),
         'cus_city': "Dhaka",
         'cus_country': "Bangladesh",
-        
-        # ✅ Required shipping info
-        'ship_name': f"{user.first_name} {user.last_name}" or "Customer Name",
-        'ship_add1': getattr(user, 'address', 'Dhaka'),
+        'ship_name': f"{request.user.first_name} {request.user.last_name}" or "Customer",
+        'ship_add1': getattr(request.user, "address", "Dhaka"),
         'ship_city': "Dhaka",
         'ship_postcode': "1000",
         'ship_country': "Bangladesh",
-        
         'shipping_method': "Courier",
-        'multi_card_name': "",
         'num_of_item': num_items,
-        'product_name': "E-commerce Products",
-        'product_category': "General",
+        'product_name': "Rent Payment",
+        'product_category': "Service",
         'product_profile': "general"
     }
 
     try:
-        response = sslcz.createSession(post_body)  # create sandbox session
-        if response.get("status") == 'SUCCESS':
-            return Response({"payment_url": response['GatewayPageURL']}, status=status.HTTP_200_OK)
-        return Response({"error": "Payment initiation failed", "details": response}, status=status.HTTP_400_BAD_REQUEST)
+        response = sslcz.createSession(post_body)
     except Exception as e:
-        return Response({"error": "Exception occurred", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # update tx
+        tx.status = "failed"
+        tx.gateway_response = {"exception": str(e)}
+        tx.save()
+        return Response({"error": "Failed to create payment session", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# {
-#   "amount": 1500,
-#   "orderId": "ORD987654",
-#   "numItems": 3
-# }
+    # If gateway returned success
+    tx.gateway_response = response
+    tx.status = "pending" if response.get("status") == "SUCCESS" else "failed"
+    tx.save()
 
+    if response.get("status") == "SUCCESS":
+        return Response({"payment_url": response.get("GatewayPageURL"), "tran_id": tran_id}, status=status.HTTP_200_OK)
+
+    return Response({"error": "Payment initiation failed", "details": response}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(["POST"])
 def payment_success(request):
+    """
+    Handle payment success callback from SSLCommerz.
+    Updates PaymentTransaction, linked RentRequest, and advertisement booking.
+    """
     data = request.data
-    print("✅ Payment Success:", data)
-
-    tran_id = data.get("tran_id")  # SSLCommerz returns this
+    tran_id = data.get("tran_id")
     if not tran_id:
         return Response({"error": "Missing tran_id"}, status=400)
 
-    # Extract order_id from tran_id (because you set it as txn_{order_id})
-    try:
-        order_id = tran_id.split("_", 1)[1]   # gets "ORD987654"
-    except IndexError:
-        return Response({"error": "Invalid tran_id format"}, status=400)
+    print("✅ Payment Success Callback Received:", tran_id)
 
-    try:
-        order = RentRequest.objects.get(id=order_id)
-        order.status = "advanced"   # mark as paid/advanced
-        order.save()
-    except RentRequest.DoesNotExist:
-        return Response({"error": f"RentRequest {order_id} not found"}, status=404)
+    # Wrap all DB operations in a single transaction
+    with transaction.atomic():
+        try:
+            tx = PaymentTransaction.objects.select_for_update().get(transaction_id=tran_id)
+        except PaymentTransaction.DoesNotExist:
+            return Response({"error": "Transaction not found"}, status=404)
 
-    return Response({"status": "SUCCESS", "data": data})
+        # Save gateway payload and mark transaction as success
+        tx.gateway_response = data
+        tx.status = "success"
+        tx.save()
 
+        print("🔔 Payment successful for transaction:", tx)
+
+        # If linked to a rent_request, update its status and lock the ad
+        if tx.rent_request:
+            rent_request = tx.rent_request
+            rent_request.status = "advanced"
+            rent_request.save()
+
+            # Lock the ad to prevent race conditions
+            ad = RentAdvertisement.objects.select_for_update().get(id=rent_request.advertisement.id)
+            ad.booked = True
+            ad.booked_by = tx.user
+            ad.save()
+
+            print("🔔 Rent request updated and advertisement booked:", ad)
+
+    return Response({
+        "status": "SUCCESS",
+        "tran_id": tran_id,
+        "rent_request": tx.rent_request.id if tx.rent_request else None,
+        "message": "Payment successful, advertisement booked." if tx.rent_request else "Payment successful."
+    }, status=200)
 
 
 @api_view(["POST"])
