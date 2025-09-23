@@ -189,13 +189,20 @@ class RentRequestCreateSerializer(serializers.ModelSerializer):
         model = RentRequest
         fields = ["message"]
 
-
+class SimpleRentRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RentRequest
+        fields = ["id", "advertisement", "status", "sender", "created_at"]
+        depth = 1  # optional, to expand related advertisement/sender
+        
 
 class PaymentTransactionSerializer(serializers.ModelSerializer):
+    user=SimpleUserSerializer(read_only=True)
+    rent_request = SimpleRentRequestSerializer(read_only=True)
     class Meta:
         model = PaymentTransaction
         fields = "__all__"
-        read_only_fields = ["id", "user", "gateway_response", "created_at", "updated_at"]
+        read_only_fields = ["id", "rent_request", "user", "gateway_response", "created_at", "updated_at"]
 
 class CreatePaymentSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)

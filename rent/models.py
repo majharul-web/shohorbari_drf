@@ -218,6 +218,7 @@ class Review(models.Model):
 
 
 
+
 class PaymentTransaction(models.Model):
     STATUS_CHOICES = (
         ("initiated", "Initiated"),

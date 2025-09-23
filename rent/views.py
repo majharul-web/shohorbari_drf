@@ -30,7 +30,7 @@ from rent.serializers import (
 )
 
 
-from django.conf import settings as main_settings
+from django.conf import settings
 
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -175,7 +175,26 @@ class RentRequestViewSet(viewsets.ModelViewSet):
                 "detail": "You have already sent a request for this advertisement."
             })
 
-        serializer.save(advertisement=ad, sender=self.request.user, status="pending")
+        self.instance = serializer.save(
+            advertisement=ad,
+            sender=self.request.user,
+            status="pending"
+        )
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        # Add custom data
+        return Response(
+            {
+                "message": "Rent request created successfully",
+                "id": self.instance.id,   # newly created request ID
+                "status": self.instance.status,
+                "advertisement": self.instance.advertisement.id,
+            },
+            status=status.HTTP_201_CREATED
+        )
+        
+        
 
     @action(detail=True, methods=['post'])
     def change_status(self, request, ad_pk=None, pk=None):
@@ -456,6 +475,7 @@ def initiate_payment(request):
         tx.status = "failed"
         tx.gateway_response = {"exception": str(e)}
         tx.save()
+        
         return Response({"error": "Failed to create payment session", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # If gateway returned success
@@ -510,12 +530,14 @@ def payment_success(request):
 
             print("🔔 Rent request updated and advertisement booked:", ad)
 
-    return Response({
-        "status": "SUCCESS",
-        "tran_id": tran_id,
-        "rent_request": tx.rent_request.id if tx.rent_request else None,
-        "message": "Payment successful, advertisement booked." if tx.rent_request else "Payment successful."
-    }, status=200)
+    return HttpResponseRedirect(f"{settings.FRONTEND_URL}/payment-success?tran_id={tran_id}")
+
+    # return Response({
+    #     "status": "SUCCESS",
+    #     "tran_id": tran_id,
+    #     "rent_request": tx.rent_request.id if tx.rent_request else None,
+    #     "message": "Payment successful, advertisement booked." if tx.rent_request else "Payment successful."
+    # }, status=200)
 
 
 @api_view(["POST"])
@@ -524,7 +546,8 @@ def payment_fail(request):
     print("❌ Payment Failed:", data)
 
     # Update order/payment status as FAILED
-    return Response({"status": "FAILED", "data": data})
+    # return Response({"status": "FAILED", "data": data})
+    return HttpResponseRedirect(f"{settings.FRONTEND_URL}/payment-failed")
 
 
 @api_view(["POST"])
@@ -533,4 +556,5 @@ def payment_cancel(request):
     print("⚠️ Payment Cancelled:", data)
 
     # Update order/payment status as CANCELLED
-    return Response({"status": "CANCELLED", "data": data})
+    # return Response({"status": "CANCELLED", "data": data})
+    return HttpResponseRedirect(f"{settings.FRONTEND_URL}/payment-cancelled")
