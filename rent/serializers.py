@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review, PaymentTransaction
 from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class EmptySerializer(serializers.Serializer):
@@ -35,16 +38,29 @@ class CategorySerializer(serializers.ModelSerializer):
         
 class SimpleUserSerializer(serializers.ModelSerializer):
     """
-    Simplified user representation showing only `id` and `name`.
+    Simplified user representation showing only `id`, `name`, `email`, and profile image.
+    Returns the full URL for profile_image if available.
     """
-    name = serializers.SerializerMethodField(method_name='get_name', help_text="Full name of the user.")
+    name = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
 
     class Meta:
-        model = get_user_model()
-        fields = ['id', 'name', 'email','profile_image']
+        model = User
+        fields = ["id", "name", "email", "profile_image"]
 
     def get_name(self, obj):
         return obj.get_full_name()
+
+    def get_profile_image(self, obj):
+        request = self.context.get("request")
+        if obj.profile_image:
+            # If Cloudinary is used, obj.profile_image.url is already a full URL
+            image_url = obj.profile_image.url
+            # If it's local storage, prepend the domain
+            if request is not None:
+                return request.build_absolute_uri(image_url)
+            return image_url
+        return None
 
 
 class SimpleAdvertisementSerializer(serializers.ModelSerializer):
