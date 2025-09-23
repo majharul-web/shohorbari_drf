@@ -299,6 +299,7 @@ class FavoriteViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
+
 class ReviewListViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint to get all reviews across all advertisements.
@@ -306,7 +307,19 @@ class ReviewListViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Review.objects.all().select_related("user", "advertisement")
     serializer_class = ReviewSerializer
-    permission_classes = [permissions.AllowAny]  # anyone can view reviews
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        serializer = self.get_serializer(queryset, many=True)
+        data = {
+            "count": queryset.count(),
+            "results": serializer.data,
+            "message": "All reviews retrieved successfully"
+        }
+        return Response(data)
+
 
     
 class ReviewViewSet(viewsets.ModelViewSet):
