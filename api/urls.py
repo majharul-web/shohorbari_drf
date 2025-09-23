@@ -9,7 +9,7 @@ from rent.views import (
     ReviewViewSet,
     AdvertisementImageViewSet,
     MyRequestsViewSet,
-    
+    ReviewListView,
     MyPaymentsViewSet,
     initiate_payment,
     payment_success,
@@ -28,6 +28,7 @@ router.register("favorites", FavoriteViewSet, basename="favorites")
 router.register("categories", CategoryViewSet, basename="categories")
 router.register("dashboard/stats", DashboardStatsViewSet, basename="dashboard-stats")
 router.register("my-requests", MyRequestsViewSet, basename="my-requests")
+path("reviews/", ReviewListView.as_view(), name="all-reviews"),
 # existing router
 router.register("payments", PaymentTransactionViewSet, basename="payments")      # admin only
 router.register("my-payments", MyPaymentsViewSet, basename="my-payments")       # user history (readonly)

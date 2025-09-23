@@ -1,4 +1,4 @@
-from rest_framework import viewsets, permissions, status, filters, serializers
+from rest_framework import generics, viewsets, permissions, status, filters, serializers
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -139,15 +139,14 @@ class AdvertisementImageViewSet(viewsets.ModelViewSet):
         return {'advertisement_id': self.kwargs.get('ad_pk')}
 
 
+
+
 class RentRequestViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for managing rent requests for advertisements.
-    """
     queryset = RentRequest.objects.all()
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
-        if self.action == "accept":
+        if self.action == "change_status":
             return EmptySerializer
         if self.action in ['create', 'update']:
             return RentRequestCreateSerializer
@@ -166,86 +165,112 @@ class RentRequestViewSet(viewsets.ModelViewSet):
         ad_id = self.kwargs.get("ad_pk")
         ad = RentAdvertisement.objects.get(id=ad_id)
 
-        # ❌ Prevent new requests if one already accepted
         if RentRequest.objects.filter(advertisement=ad, status="accepted").exists():
-            raise serializers.ValidationError({"detail": "This advertisement already has an accepted request. You cannot send a new request."})
+            raise serializers.ValidationError({
+                "detail": "This advertisement already has an accepted request."
+            })
 
-        # ❌ Prevent same user sending multiple requests
         if RentRequest.objects.filter(advertisement=ad, sender=self.request.user).exists():
-            raise serializers.ValidationError({"detail": "You have already sent a request for this advertisement."})
+            raise serializers.ValidationError({
+                "detail": "You have already sent a request for this advertisement."
+            })
 
         serializer.save(advertisement=ad, sender=self.request.user, status="pending")
 
-
-    @swagger_auto_schema(
-        method='post',
-        operation_summary="Accept rent request",
-        operation_description="Accept a rent request and close all other requests for the same advertisement.",
-        responses={200: openapi.Response("Request accepted")}
-    )
-
     @action(detail=True, methods=['post'])
-    def accept(self, request, ad_pk=None, pk=None):
+    def change_status(self, request, ad_pk=None, pk=None):
+        """
+        Change status of a rent request.
+        Allowed statuses: accepted, rejected, canceled
+        """
         rent_request = self.get_object()
         ad = rent_request.advertisement
+        new_status = request.data.get("status")
 
-        # ❌ Only owner can accept
-        if request.user.id != ad.owner_id:
+        if new_status not in ["accepted", "rejected", "canceled"]:
+            return Response({"detail": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Only owner can accept/reject
+        if new_status in ["accepted", "rejected"] and request.user.id != ad.owner_id:
             return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
 
-        # ❌ Prevent accepting multiple requests
-        if RentRequest.objects.filter(advertisement=ad, status="accepted").exists():
-            return Response(
-                {"detail": "An accepted request already exists for this advertisement."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # ✅ Sender can cancel their own request
+        if new_status == "canceled" and request.user.id != rent_request.sender_id:
+            return Response({"detail": "Only sender can cancel this request."}, status=status.HTTP_403_FORBIDDEN)
 
-        # ✅ Wrap in transaction
+        # ❌ Prevent rejecting/accepting already accepted
+        if rent_request.status == "accepted" and new_status in ["rejected", "canceled"]:
+            return Response({"detail": "Cannot modify an already accepted request."}, status=status.HTTP_400_BAD_REQUEST)
+
         with transaction.atomic():
-            # Accept this request
-            rent_request.status = "accepted"
-            rent_request.save()
+            if new_status == "accepted":
+                # Prevent multiple accepted requests
+                if RentRequest.objects.filter(advertisement=ad, status="accepted").exists():
+                    return Response({"detail": "Another request already accepted."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Update advertisement
-            ad.accepted = True
-            ad.accepted_for = rent_request.sender   # or .renter depending on your model
-            ad.save()
+                rent_request.status = "accepted"
+                rent_request.save()
 
-            # Close other requests
-            RentRequest.objects.filter(advertisement=ad).exclude(id=rent_request.id).update(status="closed")
+                ad.accepted = True
+                ad.accepted_for = rent_request.sender
+                ad.save()
+
+                # Close other requests
+                RentRequest.objects.filter(advertisement=ad).exclude(id=rent_request.id).update(status="closed")
+
+            else:
+                # Simple rejection/cancel
+                rent_request.status = new_status
+                rent_request.save()
 
         return Response({
-            "status": "request accepted",
+            "status": f"request {new_status}",
+            "request_id": rent_request.id,
             "advertisement": ad.id,
-            "accepted_for": ad.accepted_for.id if ad.accepted_for else None
-        })
-
-
+            "by": request.user.id
+        }, status=status.HTTP_200_OK)
 
 
 class MyRequestsViewSet(viewsets.ViewSet):
     """
-    API endpoint to list all rent requests made by the authenticated user.
-    Supports filtering by status (?status=pending).
+    API endpoint to list rent requests for the authenticated user.
+    - ?type=sent      → Requests sent by the user.
+    - ?type=received  → Requests received by the user's advertisements.
+    - ?status=pending → Optional filter by status.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
-        # ✅ Start with requests sent by the logged-in user
-        queryset = RentRequest.objects.filter(sender=request.user).select_related(
-            "advertisement", "advertisement__owner"
-        ).prefetch_related("advertisement__images")
+        req_type = request.query_params.get("type", "sent")  # default to "sent"
+        status_param = request.query_params.get("status")
+
+        if req_type == "received":
+            # ✅ Requests where the logged-in user is the advertisement owner
+            queryset = RentRequest.objects.filter(
+                advertisement__owner=request.user
+            ).select_related(
+                "advertisement", "advertisement__owner", "sender"
+            ).prefetch_related("advertisement__images")
+
+        else:  # "sent"
+            # ✅ Requests sent by the logged-in user
+            queryset = RentRequest.objects.filter(
+                sender=request.user
+            ).select_related(
+                "advertisement", "advertisement__owner"
+            ).prefetch_related("advertisement__images")
 
         # ✅ Optional filter by status
-        status = request.query_params.get("status")
-        if status:
-            queryset = queryset.filter(status=status)
+        if status_param:
+            queryset = queryset.filter(status=status_param)
 
         serializer = RentRequestSerializer(queryset, many=True)
         return Response({
+            "type": req_type,
             "count": queryset.count(),
             "results": serializer.data
         })
+
 
 class FavoriteViewSet(viewsets.ModelViewSet):
     """
@@ -274,6 +299,14 @@ class FavoriteViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
+class ReviewListView(generics.ListAPIView):
+    """
+    API endpoint to get all reviews across advertisements.
+    """
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.AllowAny]  # anyone can view reviews
+    
 class ReviewViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing reviews on advertisements.
