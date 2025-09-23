@@ -56,9 +56,9 @@ class SimpleUserSerializer(serializers.ModelSerializer):
         if obj.profile_image:
             # If Cloudinary is used, obj.profile_image.url is already a full URL
             image_url = obj.profile_image.url
-            # If it's local storage, prepend the domain
+            # If it's local storage, prepend the domaindf
             if request is not None:
-                return request.build_absolute_uri(image_url)
+                return request.build_absolute_uri(image_url) 
             return image_url
         return None
 
