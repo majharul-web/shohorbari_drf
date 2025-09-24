@@ -55,9 +55,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class RentAdvertisementViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for creating, retrieving, updating, and managing rental advertisements.
-    """
     queryset = RentAdvertisement.objects.select_related('category', 'owner').prefetch_related(
         'images',
         Prefetch('reviews', queryset=Review.objects.select_related('user'))
@@ -71,12 +68,19 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Admins see all ads, normal users see only their own.
+        If `?my=true` is passed, return only the current user's ads.
+        Otherwise return all ads.
         """
-        user = self.request.user
-        if user.is_staff:  # ✅ Admin user
-            return self.queryset
-        return self.queryset.filter(owner=user)  # ✅ Normal user
+        queryset = super().get_queryset()
+        my = self.request.query_params.get("my")
+
+        if my and my.lower() == "true":
+            if self.request.user.is_authenticated:
+                queryset = queryset.filter(owner=self.request.user)
+            else:
+                queryset = queryset.none()
+
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "approve":
@@ -95,32 +99,6 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user, approved=False)
-
-    @swagger_auto_schema(
-        method='post',
-        operation_summary="Approve rental advertisement",
-        operation_description="Mark a rental advertisement as approved (Admin only).",
-        responses={200: openapi.Response("Advertisement approved successfully")}
-    )
-    @action(detail=True, methods=['post'])
-    def approve(self, request, pk=None):
-        ad = self.get_object()
-        ad.approved = True
-        ad.save()
-        return Response({'status': 'advertisement approved'})
-
-    @swagger_auto_schema(
-        method='get',
-        operation_summary="List pending advertisements",
-        operation_description="Retrieve all advertisements that are not yet approved.",
-        responses={200: RentAdvertisementSerializer(many=True)}
-    )
-    @action(detail=False, methods=['get'])
-    def pending(self, request):
-        ads = self.queryset.filter(approved=False)
-        serializer = self.get_serializer(ads, many=True)
-        return Response(serializer.data)
-
 
 
 class AdvertisementImageViewSet(viewsets.ModelViewSet):
