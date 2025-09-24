@@ -57,7 +57,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class RentAdvertisementViewSet(viewsets.ModelViewSet):
     """
     API endpoint for creating, retrieving, updating, and managing rental advertisements.
-    Supports filtering, searching, and ordering.
     """
     queryset = RentAdvertisement.objects.select_related('category', 'owner').prefetch_related(
         'images',
@@ -69,6 +68,15 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'description']
     ordering_fields = ['created_at', 'price']
     ordering = ['-created_at']
+
+    def get_queryset(self):
+        """
+        Admins see all ads, normal users see only their own.
+        """
+        user = self.request.user
+        if user.is_staff:  # ✅ Admin user
+            return self.queryset
+        return self.queryset.filter(owner=user)  # ✅ Normal user
 
     def get_serializer_class(self):
         if self.action == "approve":
@@ -82,14 +90,10 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
         elif self.action in ['approve', 'pending']:
             return [permissions.IsAdminUser()]
-        else :
+        else:
             return [permissions.IsAuthenticatedOrReadOnly()]
-       
 
     def perform_create(self, serializer):
-        """
-        Attach the logged-in user as the owner when creating an ad.
-        """
         serializer.save(owner=self.request.user, approved=False)
 
     @swagger_auto_schema(
@@ -116,6 +120,7 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
         ads = self.queryset.filter(approved=False)
         serializer = self.get_serializer(ads, many=True)
         return Response(serializer.data)
+
 
 
 class AdvertisementImageViewSet(viewsets.ModelViewSet):
