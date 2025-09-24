@@ -46,7 +46,7 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "name", "email", "profile_image"]
+        fields = ["id", "name", "email","role", "profile_image"]
 
     def get_name(self, obj):
         return obj.get_full_name()
