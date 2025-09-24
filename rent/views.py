@@ -143,6 +143,21 @@ class RentRequestViewSet(viewsets.ModelViewSet):
                 return RentRequest.objects.none()
             return RentRequest.objects.filter(advertisement=ad)
         return super().get_queryset()
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        # 🔹 Custom response format
+        return Response(
+            {
+                "success": True,
+                "count": queryset.count(),
+                "ad_id": kwargs.get("ad_pk"),
+                "results": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def perform_create(self, serializer):
         ad_id = self.kwargs.get("ad_pk")
