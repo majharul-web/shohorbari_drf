@@ -1,6 +1,6 @@
 # 🏠 Shohorbari - A Full-Stack Rental Management Application
 
-Shohorbari is a comprehensive **full-stack rental management platform** built using **Next.js (frontend)** and **Django Rest Framework (backend)**.  
+Shohorbari is a comprehensive **full-stack rental management platform** built using **React.js (frontend)** and **Django Rest Framework (backend)**.  
 It provides a robust system for managing rental advertisements, user accounts, and rental requests — suitable for building an online rental marketplace.
 
 ---
@@ -22,6 +22,7 @@ It provides a robust system for managing rental advertisements, user accounts, a
 - **Search** functionality for advertisements
 - **Pagination** for advertisement listings
 - **Admin Interface** for managing advertisements and requests
+- **Payment Integration** SSlCommerz (sandbox mode)
 
 ---
 
