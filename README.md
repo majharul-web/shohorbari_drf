@@ -54,11 +54,6 @@ It provides a robust system for managing rental advertisements, user accounts, a
 - **GitHub Repo**: https://github.com/majharul-web/shohorbari_drf
 - **Live API**: https://shohorbari-drf.vercel.app/
 
-### 🔑 Django Admin Panel Credentials
-
-- Email: `admin@gmail.com`
-- Password: `12345`
-
 ---
 
 ## Installation
