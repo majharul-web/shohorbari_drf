@@ -16,17 +16,12 @@ from rest_framework.decorators import api_view, permission_classes
 from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-
-
 import uuid
-
-
-
 
 from rent.serializers import (
     CategorySerializer, AdvertisementImageSerializer, RentAdvertisementSerializer,
     RentAdvertisementCreateSerializer, RentRequestSerializer, RentRequestCreateSerializer,
-    FavoriteSerializer, GetFavoriteSerializer, ReviewSerializer, EmptySerializer,CreatePaymentSerializer,PaymentTransactionSerializer
+    FavoriteSerializer, GetFavoriteSerializer, ReviewSerializer, EmptySerializer,CreatePaymentSerializer,PaymentTransactionSerializer,RentAdvertisementUpdateSerializer
 )
 
 
@@ -87,7 +82,10 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
             return EmptySerializer
         if self.action == "create":
             return RentAdvertisementCreateSerializer
+        if self.action in ["update", "partial_update"]:
+            return RentAdvertisementUpdateSerializer
         return RentAdvertisementSerializer
+
 
     def get_permissions(self):
         if self.action in ['update', 'partial_update', 'destroy']:

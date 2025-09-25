@@ -143,6 +143,14 @@ class RentAdvertisementSerializer(serializers.ModelSerializer):
             "id", "owner", "category", "title", "description", "price",
             "approved", "booked", "created_at", "images", "reviews"
         ]
+class RentAdvertisementUpdateSerializer(serializers.ModelSerializer):
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
+
+    class Meta:
+        model = RentAdvertisement
+        fields = ["id", "category", "title", "description", "price"]
+        read_only_fields = ["id"]
+
 
 
 class RentAdvertisementCreateSerializer(serializers.ModelSerializer):
@@ -151,7 +159,8 @@ class RentAdvertisementCreateSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = RentAdvertisement
-        fields = ["category", "title", "description", "price"]
+        fields = ["id","category", "title", "description", "price"]
+        read_only_fields = ["id"]
 
     def create(self, validated_data):
         """
