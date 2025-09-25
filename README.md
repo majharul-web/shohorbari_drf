@@ -40,12 +40,12 @@ It provides a robust system for managing rental advertisements, user accounts, a
 
 - **Advertiser**
 
-  - Email: `admin@gmail.com`
-  - Password: `12345`
+  - Email: `gck0ijjol0@jxpomup.com`
+  - Password: `Admin1#%`
 
 - **Customer**
-  - Email: `admin@gmail.com`
-  - Password: `12345`
+  - Email: `p7oohsuhm6@jxpomup.com`
+  - Password: `Admin1#%`
 
 ---
 
