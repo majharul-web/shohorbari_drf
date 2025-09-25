@@ -97,6 +97,23 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user, approved=False)
+        
+    # Approve action
+    
+    @swagger_auto_schema(
+        method='post',
+        operation_summary="Approve rental advertisement",
+        operation_description="Mark a rental advertisement as approved (Admin only).",
+        responses={200: openapi.Response("Advertisement approved successfully")}
+    )
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        ad = self.get_object()
+        if ad.approved:
+            return Response({"detail": "Advertisement is already approved."}, status=status.HTTP_400_BAD_REQUEST)
+        ad.approved = True
+        ad.save()
+        return Response({"status": "advertisement approved"}, status=status.HTTP_200_OK)
 
 
 class AdvertisementImageViewSet(viewsets.ModelViewSet):
@@ -119,22 +136,7 @@ class AdvertisementImageViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         return {'advertisement_id': self.kwargs.get('ad_pk')}
     
-    # Approve action
-    
-    @swagger_auto_schema(
-        method='post',
-        operation_summary="Approve rental advertisement",
-        operation_description="Mark a rental advertisement as approved (Admin only).",
-        responses={200: openapi.Response("Advertisement approved successfully")}
-    )
-    @action(detail=True, methods=['post'])
-    def approve(self, request, pk=None):
-        ad = self.get_object()
-        if ad.approved:
-            return Response({"detail": "Advertisement is already approved."}, status=status.HTTP_400_BAD_REQUEST)
-        ad.approved = True
-        ad.save()
-        return Response({"status": "advertisement approved"}, status=status.HTTP_200_OK)
+
 
 
 
