@@ -1,15 +1,60 @@
-# Shohorbari - A Rental Management DRF Application
+# 🏠 Shohorbari - A Full-Stack Rental Management Application
 
-Shohorbari is a comprehensive rental management application built using Django Rest Framework (DRF). It provides a robust backend for managing rental advertisements, user accounts, and rental requests, making it suitable for building online rental platforms.
+Shohorbari is a comprehensive **full-stack rental management platform** built using **React.js (frontend)** and **Django Rest Framework (backend)**.  
+It provides a robust system for managing rental advertisements, user accounts, and rental requests — suitable for building an online rental marketplace.
 
-## Features
+---
 
-- **User** authentication and registration
-- **Advertisement** management (CRUD operations)
-- **Rent Request** management (create, view, and manage requests)
+## 📚 Project Info
+
+- **Final Exam Project**: Django Full-Stack Final Assignment
+- **Project No.**: 1 — House Rent Site
+- **Developer**: Md Majharul Islam
+- **Email**: [majharul.live@gmail.com](mailto:majharul.live@gmail.com)
+
+---
+
+## ✨ Features
+
+- **User Authentication** and Registration
+- **Advertisement Management** (CRUD operations)
+- **Rent Request Management** (create, view, manage requests)
 - **Search** functionality for advertisements
 - **Pagination** for advertisement listings
-- **Admin** interface for managing advertisements and requests
+- **Admin Interface** for managing advertisements and requests
+- **Payment Integration** SSlCommerz (sandbox mode)
+
+---
+
+## 🖥️ Frontend
+
+- **GitHub Repo**: https://github.com/majharul-web/shohorbari_front
+- **Live Site**: https://shohorbari.vercel.app/
+
+### 🔑 User Credentials
+
+- **Admin**
+
+  - Email: `admin@gmail.com`
+  - Password: `12345`
+
+- **Advertiser**
+
+  - Email: `admin@gmail.com`
+  - Password: `12345`
+
+- **Customer**
+  - Email: `admin@gmail.com`
+  - Password: `12345`
+
+---
+
+## ⚙️ Backend
+
+- **GitHub Repo**: https://github.com/majharul-web/shohorbari_drf
+- **Live API**: https://shohorbari-drf.vercel.app/
+
+---
 
 ## Installation
 
