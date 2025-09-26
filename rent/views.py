@@ -63,19 +63,26 @@ class RentAdvertisementViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        If `?my=true` is passed, return only the current user's ads.
-        Otherwise return all ads.
+        Filtering logic:
+        - ?my=true   → return only the current user's ads.
+        - ?user=true → return only approved ads that are not booked.
+        - default    → return all ads.
         """
         queryset = super().get_queryset()
-        my = self.request.query_params.get("my")
+        params = self.request.query_params
 
-        if my and my.lower() == "true":
-            if self.request.user.is_authenticated:
-                queryset = queryset.filter(owner=self.request.user)
-            else:
-                queryset = queryset.none()
+        def is_true(param):
+            return params.get(param, "").strip().lower() == "true"
+
+        if is_true("my"):
+            return queryset.filter(owner=self.request.user) if self.request.user.is_authenticated else queryset.none()
+
+        if is_true("user"):
+            return queryset.filter(approved=True, booked=False)
 
         return queryset
+
+
 
     def get_serializer_class(self):
         if self.action == "approve":
