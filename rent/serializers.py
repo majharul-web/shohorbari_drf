@@ -182,7 +182,7 @@ class RentRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RentRequest
-        fields = ["id", "advertisement", "sender", "status", "message", "created_at"]
+        fields = ["id", "advertisement", "sender", "status", "message","additional_name","additional_phone","additional_address", "created_at"]
         read_only_fields = ["status", "created_at", "advertisement", "sender"]
 
 
@@ -190,13 +190,37 @@ class RentRequestCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating a rent request.
     """
+
     message = serializers.CharField(
+        required=False,
+        allow_blank=True,
         help_text="Message from the requester to the advertisement owner."
+    )
+    additional_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Additional name for the rental."
+    )
+    additional_phone = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Additional phone number for the rental."
+    )
+    additional_address = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Additional address details for the rental."
     )
 
     class Meta:
         model = RentRequest
-        fields = ["message"]
+        fields = [
+            "message",
+            "additional_name",
+            "additional_phone",
+            "additional_address",
+        ]
+
 
 class SimpleRentRequestSerializer(serializers.ModelSerializer):
     class Meta:

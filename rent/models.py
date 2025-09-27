@@ -140,11 +140,30 @@ class RentRequest(models.Model):
         default="pending",
         help_text="Status of the rent request."
     )
+    
     message = models.TextField(
         blank=True,
         default="",
         help_text="Optional message from the sender."
     )
+    additional_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional additional name for the rental."
+    )
+    additional_phone = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Optional additional phone number for the rental."
+    )
+    additional_address = models.TextField(
+        blank=True,
+        default="",
+        help_text="Optional additional address details."
+    )
+    
     created_at = models.DateTimeField(
         auto_now_add=True,
         help_text="Timestamp when the request was created."
