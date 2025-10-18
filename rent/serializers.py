@@ -31,11 +31,12 @@ class CategorySerializer(serializers.ModelSerializer):
     Serializer for property categories.
     """
     name = serializers.CharField(help_text="Name of the category.")
+    status = serializers.CharField(help_text="Status of the category.")
 
     class Meta:
         model = Category
-        fields = ["id", "name", "created_at"]
-        
+        fields = ["id", "name", "status", "created_at"]
+
 class SimpleUserSerializer(serializers.ModelSerializer):
     """
     Simplified user representation showing only `id`, `name`, `email`, and profile image.

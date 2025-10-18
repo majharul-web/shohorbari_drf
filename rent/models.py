@@ -4,12 +4,23 @@ from cloudinary.models import CloudinaryField
 
 
 class Category(models.Model):
+    STATUS_CHOICES = (
+        ("active", "Active"),
+        ("inactive", "Inactive"),
+    )
+    
     """
     Model representing a property category (e.g., Apartment, House).
     """
     name = models.CharField(
         max_length=100,
         help_text="Name of the category."
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default="active",
+        help_text="Status of the category."
     )
     
     created_at = models.DateTimeField(

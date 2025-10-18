@@ -1,4 +1,4 @@
-from rest_framework import generics, viewsets, permissions, status, filters, serializers
+from rest_framework import viewsets, permissions, status, filters, serializers
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -7,7 +7,6 @@ from drf_yasg import openapi
 from django.db.models import Prefetch
 from django.http import HttpResponseRedirect
 from sslcommerz_lib import SSLCOMMERZ
-import requests
 from api.permissions import IsAdminOrReadOnly
 from rent.paginations import DefaultPagination
 from rent.models import Category, RentAdvertisement, AdvertisementImage, RentRequest, Favorite, Review,PaymentTransaction
@@ -15,8 +14,10 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from django.conf import settings
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 import uuid
+from django.conf import settings
+from rest_framework.decorators import permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 from rent.serializers import (
     CategorySerializer, AdvertisementImageSerializer, RentAdvertisementSerializer,
@@ -25,10 +26,6 @@ from rent.serializers import (
 )
 
 
-from django.conf import settings
-
-from rest_framework.decorators import permission_classes
-from rest_framework.permissions import IsAuthenticated
 
 class IsOwnerOrAdmin(permissions.BasePermission):
     """
@@ -39,14 +36,36 @@ class IsOwnerOrAdmin(permissions.BasePermission):
         return obj.owner == request.user or request.user.role == "admin"
 
 
+
 class CategoryViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for managing property categories.
-    """
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
     pagination_class = DefaultPagination
+
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    ordering_fields = ['created_at', 'name']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        params = self.request.query_params
+
+        # Case-insensitive search
+        search = params.get("search")
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+
+        # Active filter
+        status = params.get("status")
+        if status and status.strip().lower() == "active":
+            queryset = queryset.filter(status="active")
+        elif status and status.strip().lower() == "inactive":
+            queryset = queryset.filter(status="inactive")
+        else:
+            pass  # no status filter
+
+        return queryset
 
 
 class RentAdvertisementViewSet(viewsets.ModelViewSet):
@@ -143,11 +162,6 @@ class AdvertisementImageViewSet(viewsets.ModelViewSet):
     def get_serializer_context(self):
         return {'advertisement_id': self.kwargs.get('ad_pk')}
     
-
-
-
-
-
 class RentRequestViewSet(viewsets.ModelViewSet):
     queryset = RentRequest.objects.all()
     permission_classes = [permissions.IsAuthenticated]
@@ -340,7 +354,6 @@ class FavoriteViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
-
 class ReviewListViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint to get all reviews across all advertisements.
@@ -361,8 +374,6 @@ class ReviewListViewSet(viewsets.ReadOnlyModelViewSet):
         }
         return Response(data)
 
-
-    
 class ReviewViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing reviews on advertisements.
@@ -380,10 +391,6 @@ class ReviewViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError({"detail": "You have already reviewed this advertisement."})
         serializer.save(user=self.request.user, advertisement_id=ad_id)
         
-
-
-
-
 class MyPaymentsViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Endpoint for an authenticated user to see their payments.
