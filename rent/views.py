@@ -18,6 +18,7 @@ import uuid
 from django.conf import settings
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
 
 from rent.serializers import (
     CategorySerializer, AdvertisementImageSerializer, RentAdvertisementSerializer,
@@ -286,47 +287,43 @@ class RentRequestViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
 
-class MyRequestsViewSet(viewsets.ViewSet):
-    """
-    API endpoint to list rent requests for the authenticated user.
-    - ?type=sent      → Requests sent by the user.
-    - ?type=received  → Requests received by the user's advertisements.
-    - ?status=pending → Optional filter by status.
-    """
+class MyRequestsViewSet(viewsets.GenericViewSet, viewsets.mixins.ListModelMixin):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RentRequestSerializer
+    pagination_class = DefaultPagination
 
-    def list(self, request):
-        req_type = request.query_params.get("type", "sent")  # default to "sent"
-        status_param = request.query_params.get("status")
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['status']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        req_type = self.request.query_params.get("type", "sent")
+        search = self.request.query_params.get("search")
 
         if req_type == "received":
-            # ✅ Requests where the logged-in user is the advertisement owner
             queryset = RentRequest.objects.filter(
-                advertisement__owner=request.user
+                advertisement__owner=self.request.user
+            ).select_related(
+                "advertisement", "advertisement__owner", "sender"
+            ).prefetch_related("advertisement__images")
+        else:  # sent
+            queryset = RentRequest.objects.filter(
+                sender=self.request.user
             ).select_related(
                 "advertisement", "advertisement__owner", "sender"
             ).prefetch_related("advertisement__images")
 
-        else:  # "sent"
-            # ✅ Requests sent by the logged-in user
-            queryset = RentRequest.objects.filter(
-                sender=request.user
-            ).select_related(
-                "advertisement", "advertisement__owner"
-            ).prefetch_related("advertisement__images")
+        # Manual search filter
+        if search:
+            queryset = queryset.filter(
+                Q(advertisement__title__icontains=search) |
+                Q(sender__first_name__icontains=search) |  # use actual DB fields
+                Q(sender__last_name__icontains=search) |
+                Q(sender__email__icontains=search)
+            )
 
-        # ✅ Optional filter by status
-        if status_param:
-            queryset = queryset.filter(status=status_param)
-
-        serializer = RentRequestSerializer(queryset, many=True)
-        return Response({
-            "type": req_type,
-            "count": queryset.count(),
-            "results": serializer.data
-        })
-
-
+        return queryset
 class FavoriteViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing user favorites.
@@ -393,20 +390,36 @@ class ReviewViewSet(viewsets.ModelViewSet):
         
 class MyPaymentsViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Endpoint for an authenticated user to see their payments.
-    GET /my-payments/
-    Supports ?status=success etc.
+    Authenticated user payments endpoint.
+    GET /my-payments/?status=success&search=txn123
+    Supports filtering, searching, and ordering.
     """
     serializer_class = PaymentTransactionSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = DefaultPagination  # reuse your pagination
+    pagination_class = DefaultPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+
+    # Simplify filters — only allow what users need
+    filterset_fields = ["status", "payment_type", "currency"]
+    search_fields = [
+        "transaction_id",
+        "rent_request__advertisement__title",
+    ]
+    ordering_fields = ["created_at", "amount"]
+    ordering = ["-created_at"]  # Default ordering: latest first
 
     def get_queryset(self):
-        qs = PaymentTransaction.objects.filter(user=self.request.user).select_related("rent_request")
-        status = self.request.query_params.get("status")
-        if status:
-            qs = qs.filter(status=status)
-        return qs
+        """Return only the authenticated user's transactions."""
+        user = self.request.user
+
+        # Use select_related to optimize joins for related objects
+        return (
+            PaymentTransaction.objects
+            .filter(user=user)
+            .select_related("rent_request", "user")
+        )
+
+
 
 
 
