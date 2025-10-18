@@ -69,5 +69,5 @@ class PaymentTransactionViewSet(viewsets.ModelViewSet):
     pagination_class = DefaultPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ["status", "payment_type", "currency", "user__id"]
-    search_fields = ["transaction_id", "user__email"]
+    search_fields = ["transaction_id", "user__email", "user__first_name", "user__last_name"]
     ordering_fields = ["created_at", "amount"]
